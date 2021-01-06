@@ -1,0 +1,566 @@
+---
+title: "Hx Data Science Capstone Project 2"
+author: "Tim Bishop"
+date: "04 January 2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(purrr)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(gridExtra)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(lubridate)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+
+
+```
+TRB WORKING NOTES:
+x. data download and setup
+2. write objective
+  - define my own objective and use context, assumptions
+  - state to test assumptions as next steps, use sme
+  - define my own sucess criteria, AUC/ROS
+  - talk to issues / risks of FP or FN errors
+  - talk to why i chose this dataset
+3. data description
+4. data vis and exp: i don't know what these measures are so exploring blind
+  - correlation
+  - pca
+  - visual plots of outcome by ind pred
+5. model
+  - simple tree
+  - random forest
+  - glm logistic reg, stepwise selection or reduction
+  - xgboost tree
+6. Final model selction, fit, test
+7. Conclusions
+8. Exec summary
+  
+  
+
+# Executive Summary
+
+This report describes work performed for the MovieLens Project which is part of the Hx Data Science Capstone Module.  This Capstone Module is the last of 9 modules which form the Hx Data Science certificate program.  The series of courses is based on the textbook "Introduction to Data Science" by "Rafael A. Irizarry".
+
+The objective provided for this project is to create a model which predicts movie ratings as best as possible based on data provided.  The only specific guidance was to "build upon" the modeling work already performed within the textbook on similar data and to measure models considered based on RMSE ("Root Mean Squared Error"). No requirement was specified to test other model forms, though this was done to a limited extent. As none were given, I have not considered additional business considerations or constraints such as prediction run time, transparency of the model, model suitabity in a production environment, etc.
+
+The data provided consisted of approximately 10 million records and was provided in two seperate datasets, the "edx" set for model training and the "validation" set for final independent testing of the final model recommended.  Few information field were provided in the data which included Movie identiers, user identifiers, a listing of movie genres each movie was tagged under and the movie rating with a timestamp.  The data provided was complete with no missing values and there were no apparent outliers.  I did not modify the dataset provided in any way.  Several new features were created from the basic data provided.  The new features created had intuitive appeal, for example the age of the movie at the time of rating. 
+
+Model fitting and initial testing was performed on a training and model validation datasets which were created as subsets of the "edx" training data provided.  The final model chosen was tested for predictive power using the separate "validation" dataset provided in the project definition.   Feature selection was based on a combination of testing the impact on model performance and also by using some estimates of impact in combination with judgement.
+
+As a first modeling step, the prior modeling approach from the textbook was recreated on the new MovieLens data.  This approach used regularized linear regression with predictor variables for a movie effect and a user effect to capture rating characteristics of each movie and user providing movie ratings.  Second, this model was expanded to take advantage of new features derived from the original data.  New predictive features added included the movie age at time of rating, the number of genres the movie was tagged under and indicators for a subset of the individual genres that a movie could be listed under.
+
+The final model chosen was a linear regression model with regularization.  Features used included effects for movie, user, age of movie at time of rating, the number of genres the movie was classified under and a small group of certain individual movie genres.  The final model had an RMSE of 0.864254 when predictions were tested on the final validation dataset.  This exceeds the best threshold target provided in the project instructions. Regression models have the benefits of being easy to interpret and very fast to execute once fit.  The final model chosen would be suitable for use in a real time website or other production environments.
+
+Some completely different models were considered.  However, these models were rejected as they either had less predictive power (ie larger RMSE values), or the fact that these models would not run on my computer using the the full dataset provided.  Fitting alternative models on smaller subsets of the data provided seemed inappropriate as fitting models on smaller data subsets would generally produce models that overfit to the data subsets and/or do not generalize as well to new data. 
+
+The final model chosen exceeded the best performance threshold stated in the project, did not modify the initial data, utilized  intuitive new features derived from the base data and is easy to understand.  It should always be noted that future model performance depends on the several assumptions such as future user rating behavior being consistent with past behavior as seen in the data used.  
+
+
+
+
+
+# Problem Statement & Objective
+Objective:
+-	Only RMSE given as objective:  suggest implementation aspects like run time not a current objective
+- specific guidance was to "build upon" the modelling work already performed ..
+-	No business objective or constraints provided, ie to consider speed vs accuracy trade offs
+-	I’ve assume that accuracy is key obj, not worth fitting faster less accurate models on less data etc.
+
+
+The objective provided for this project is to create a model which predicts movie ratings based on historical movie ratings.  No specific business application or constraints were given as part of the project outline.  The only specific guidance was to "build upon" the modeling work already performed within the textbook on similar data and to measure models considered based on RMSE ("Root Mean Squared Error"). No requirement was specified to test other model forms, though this was done to a limited extent. As none were given, I have not considered additional constraints such as prediction run time, transparency of the model, model suitabity in a production environment, etc.
+
+
+
+
+
+# Analysis and Methods
+
+### Data Provided
+```{r Data_Load, include=FALSE}
+
+# Create edx set, validation set (final hold-out test set)
+# 
+# Code as provided by project description
+#
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+
+# Note: this process could take a couple of minutes
+
+
+# MovieLens 10M dataset:
+# https://grouplens.org/datasets/movielens/10m/
+# http://files.grouplens.org/datasets/movielens/ml-10m.zip
+
+# dl <- tempfile()
+# download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+# 
+# ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+#                  col.names = c("userId", "movieId", "rating", "timestamp"))
+# 
+# movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+
+
+if (file.exists("ml-10M100K/ratings.dat") & file.exists("ml-10M100K/movies.dat")){
+  ratings <- fread(text = gsub("::", "\t", readLines( "ml-10M100K/ratings.dat")),
+                   col.names = c("userId", "movieId", "rating", "timestamp"))
+  
+  movies <- str_split_fixed(readLines( "ml-10M100K/movies.dat"), "\\::", 3)
+  
+} else {
+  dl <- tempfile()
+  download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+  ratings <- fread(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                 col.names = c("userId", "movieId", "rating", "timestamp"))
+
+  movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+  
+}
+
+colnames(movies) <- c("movieId", "title", "genres")
+
+
+
+# if using R 4.0 or later:
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
+                                           title = as.character(title),
+                                           genres = as.character(genres))
+
+
+movielens <- left_join(ratings, movies, by = "movieId")
+
+# Validation set will be 10% of MovieLens data
+set.seed(1, sample.kind="Rounding") 
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+# Make sure userId and movieId in validation set are also in edx set
+validation <- temp %>% 
+  semi_join(edx, by = "movieId") %>%
+  semi_join(edx, by = "userId")
+
+# Add rows removed from validation set back into edx set
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+
+
+
+
+# define RMSE function for use later
+RMSE <- function(true_ratings, predicted_ratings){
+  sqrt(mean((true_ratings - predicted_ratings)^2))
+}
+
+```
+
+Data for this project was provided from the [GroupLens](https://grouplens.org/) website.  Code provided in the project requirements downloaded movie and movie ratings data for approximately 10 million movie ratings.  This code also split the data into a dataset named "edx" for use in model traiing and a dataset named "validation" to be used for independent testing of the final model selected.  The validation set was approximately 10% of the data, or 1 million records.
+
+Fields within the data were:
+ 
+ - mserId: a unique ID number for the system user who provided the movie rating
+ - movieId: an unique ID number for the movie being rated.
+ - rating: the movie rating given by the user.
+ - timestamp: the time and date that the rating was recorded.
+ - title:  the movie title followed by the movie release year in brackets
+ - genres:  a list of all genres the movie has been listed under
+
+
+\newpage
+### Initial Data Validation, Analysis & Cleaning
+
+The "summary" function was used to perform initial data quality assessment.  Appendix A contains the summary output for both the edx and validation datasets.  It is clear that neither dataset has any missing values in any fields.  Also, there were no apparent outliers for numeric fields showing ratings.  The following shows the output from the summary function as well as a bar plot showing the counts of each rating score.
+
+The following graphs show the counts of various rating scores: 
+```{r Initial_Data_Validation, fig.align="left", echo=FALSE}
+
+# Initial Data Validation & 
+#
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+
+
+# Graphics for data exploration
+# at this point, there isn't much that can be graphed to show variation in 
+# ratings by a predictor
+
+# look at distribution of ratings in edx and validation sets
+p1 <- edx %>% ggplot( aes(rating)) + geom_bar( ) +  ggtitle("Ratings - edx Dataset")
+p2 <- validation %>% ggplot( aes(rating)) + geom_bar() + ggtitle("Ratings - Validation Dataset")
+
+grid.arrange(p1, p2, ncol=2)
+
+
+```
+
+Looking at the counts of ratings, a bias can be seen where there are far more "whole star" ratings than "half star" ratings.  At first look it appears Users prefer to give whole star ratings.  This characteristic of the data will be investigated further after additional features are extracted from the data.
+
+The distribution of ratings appear to be consistent between the edx and validation datasets.  The average rating is the same in each dataset.
+
+No transformations applied to the base data provided.
+
+
+
+### New Feature Extraction
+```{r Feature_Extraction, include=FALSE}
+#
+#  FEATURE Extraction SECTION
+#
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+
+# As a first step to improving the predictions provided,
+# additional features will be extracted from the data provided.
+
+########################################
+#
+#   Creating New Features
+#
+# Note: module 6.2 from Hx ML course covered the movielens predictor
+
+
+# add feature for number of genres listed for each movie
+# the premise is that "cross over" movies are likely more popular
+# Similarly, popular movies may draw more genres since they are considered more
+# Lastly, multi-genres movies likely draw more search hits, get more views and reviews.
+edx <- edx %>% mutate(genres_count = sapply(genres, function(c){length(str_split(c,"\\|", simplify = TRUE))}))
+
+
+
+# extract year of movie release from data field "title" in dataset
+#NOTE: this takes a few minutes to run.
+edx <- edx %>% mutate(movie_year = as.numeric(  str_sub(  str_extract(title,"\\(\\d{4}\\)") , 2, 5)))
+
+
+
+edx <- edx %>% mutate(rating_date = as.POSIXct(timestamp, origin ='1970-01-01') )
+edx <- edx %>% mutate(rating_year = year(rating_date))
+
+
+# create feature approximating age of movie at time of rating
+edx <- mutate(edx, age_at_rating = rating_year - movie_year)
+
+
+# a small number of movies have rating coded in years prior to the movie release date in the title
+# ASSUMING this is a data error and will set age at rating to 0 (ie rating is same year of release) for these
+edx$age_at_rating[edx$age_at_rating < 0] <- 0
+
+
+
+
+
+# data description as provided 
+# from https://grouplens.org/datasets/movielens/latest/
+# Genres are a pipe-separated list, and are selected from the following:
+#   
+# Action
+# Adventure
+# Animation
+# Childrens
+# Comedy
+# Crime
+# Documentary
+# Drama
+# Fantasy
+# Film-Noir
+# Horror
+# Musical
+# Mystery
+# Romance
+# Sci-Fi
+# Thriller
+# War
+# Western
+# (no genres listed)
+
+# using the individual genres in the genres list and set up binary indicator variables for each 
+# individual genres
+# Note: GroupLens website (the source of the original data) was used to obtain the list of 
+# possible individual genres.
+
+
+edx <- mutate( edx,
+               Action = as.integer( str_detect(genres, "Action")),
+               Adventure = as.integer( str_detect(genres, "Adventure")),
+               Animation = as.integer( str_detect(genres, "Animation")),
+               Children = as.integer( str_detect(genres, "Children")),
+               Comedy = as.integer( str_detect(genres, "Comedy")),
+               Crime = as.integer( str_detect(genres, "Crime")),
+               Documentary = as.integer( str_detect(genres, "Documentary")),
+               Drama = as.integer( str_detect(genres, "Drama")),
+               Fantasy = as.integer( str_detect(genres, "Fantasy")),
+               FilmNoir = as.integer( str_detect(genres, "Film-Noir")),
+               Horror = as.integer( str_detect(genres, "Horror")),
+               Musical = as.integer( str_detect(genres, "Musical")),
+               Mystery = as.integer( str_detect(genres, "Mystery")),
+               Romance = as.integer( str_detect(genres, "Romance")),
+               SciFi = as.integer( str_detect(genres, "Sci-Fi")),
+               Thriller = as.integer( str_detect(genres, "Thriller")),
+               War = as.integer( str_detect(genres, "War")),
+               Western = as.integer( str_detect(genres, "Western"))
+)
+# note coding above implicitly creates a last category which is none of the above.
+# explicitly encoding an "other" category is not required as the information is captured as zeros in all fields above
+
+edx$pre_half_star <- ifelse(edx$rating_year < 2003,1,0)
+
+
+```
+Using the basic data provided a number of new features were generated before considering any models as these had intuitive appeal.  These are as follows:  
+
+1. The number of genres listed for each movie.  The premise is that a higher number of genres listed could indicate a cross-over hit that are likely more popular.  Similarly, popular movies may draw more genres since they are considered more.  Lastly, multi-genres movies likely draw more search hits, getting more views and reviews.
+2. Using the year of the movies release included within the movie title, the year of release was extracted and included in new field in the dataset.
+3. Using the rating timestamp, I extracted the year that each rating was provided.  I did not consider time of day for each rating as having predictive value at this point.
+4. Using the year of movie release and the year included in the rating timestamp, I estimated the age of the movie at time of rating (in years). The premise is that "classics" will draw more favourable ratings and older movies that are still being watched are generally classics.  Using the age of the movie at rating, rather than simply using the movie release year, would be a more movie specific characteristic that would generalize better to other data which would likely have different review dates. Note, for a rather small number of movies, ratings appear to have occurred in the data pior to the movie release date.  While this could be technically possible for cases of pre-release reviews, I have chosen to set these negative age at rating cases to be zero, which is the same as assuming these ratings occurred in the same year as the movie release.
+5. To measure the effect of ratings on individual genre categories, each individual genre listed in the genres field were split out and coded as binary indicators to show if the movie was listed under that genre. The [GroupLens](https://grouplens.org/datasets/movielens/latest/) website was used as reference to get the data description for the names of the individual genres that could be listed for each movie.
+
+Other features were considered and but created initially:
+
+*  feature to indicate number of ratings for each movie. Since a movie effect was already included, this features was considered repetitive. 
+*  feature to indicate number of ratings by each user. Since a user effect was already included, this features was considered repetitive.
+*  time of day (ie morning, evening, prime time, late night) was not pursued at this time but was noted for consideration if needed to get desired model performance.
+  
+These features were kept in mind for later addition if model performance required improvement.
+
+Given the small number and characteristics of data fields provided, I did not consider creating any features to model interaction affects.  Interactions maybe considered later within model development and specification.
+
+An analysis was performed to assess the data quality of the new features created.  Observations and comments are as follows:
+
+1. Movies release dates go back to the 1930's.  Reviewing the titles of these older movies, the year of release appeared correct.
+2. Ratings dates go back as far as 1995.  This appeared to make sense on the assumption that these movie ratings were likely collected using an online system and such systems did not exist much earlier than this.
+3. As mentioned above, ratings are heavily biased toward whole number ratings.  A check on the rating_date feature created showed that 1/2 star ratings only began in 2003.  From 1995 to 2002, only whole star ratings are present.  This was likely due to a change in the rating process for rating options given.  For this reason, an additional feature called "pre_half_star" was created.  The predictive power of the pre_half_star feature will be assessed in the model development.
+
+
+\newpage
+### Feature Exploration, Visualization & Selection
+
+A few approaches were used to assess the potential predictive power of the base data and new features.  
+
+```{r Data_and_Feature_Exploration, fig.height= 6, fig.width=6,  echo=FALSE}
+
+
+
+edx %>% ggplot( aes(age_at_rating, fill= as.factor(rating))) + 
+  geom_bar(position = "stack") + 
+  ggtitle("Counts of Movie Age At Rating") + 
+  ylab("rating counts") +
+  scale_fill_discrete(name = "ratings")
+```
+
+The visualization above shows the change in ratings counts over the age of the movie at the time of rating.  While the rating counts by age variation is clear, the change in distribution of ratings by age is not.  This same information is presented differently below to show how the distribution of ratings changes by age of movie.
+
+```{r Data_and_Feature_Exploration2, fig.height= 6, fig.width=6, echo=FALSE}
+edx %>% ggplot( aes(age_at_rating, fill= as.factor(rating))) + 
+  geom_bar(position = "fill") + 
+  ggtitle("Percentages of Each Rating by Age of Movie At Rating") +
+  ylab("rating distribution") +
+  scale_fill_discrete(name = "ratings")
+```
+
+It is clear that ratings vary over the age of the movie at the time of rating.  In particular, the average rating increase by age of movie and then drop abruptly for very old movies.  One possible reason for the drop in very old movies is an intolerance for movies that didn't have audio dialog.  It is expected age of movie  will be a strong predictor.
+
+```{r Data_and_Feature_Exploration3, fig.height= 6, fig.width=6, echo=FALSE}
+edx %>% ggplot( aes(genres_count, fill= as.factor(rating))) + 
+  geom_bar(position = "fill") + 
+  ggtitle("Percentages of Each Rating by # of Genres Listed for a Movie") +
+  ylab("rating distribution") +
+  scale_fill_discrete(name = "ratings")
+
+```
+
+The graph above shows the distribution of ratings over the different values for number of genres listed for a movie.  This plot shows less variation over genre counts, but does show some potential explanatory power over higher values.
+
+To assess the impact of individual genre indicators on ratings, a few views were considered.  As there a quite a few individual genres, a table based, numerical approach to viewing impact was more interpretable than visualizations.  
+
+The following tables show the values which were created to help assess the potential impact of a movie being labeled under a given individual genre.   The same table has been repeated 3 times using different sorting priorities in order to get different views on which genres have the biggest impact on RMSE.  
+
+A description of these values will follow.
+
+```{r Data_and_Feature_Exploration4, include=FALSE, warning=FALSE}
+
+
+
+overall_ave_rating <- mean(edx$rating)
+
+ave_ratings_by_genres_count <- edx %>% group_by(genres_count ) %>%
+      summarise(ave_rating = sum(rating)/n())
+
+                             
+```
+```{r Data_and_Feature_Exploration5, echo=FALSE}
+
+ave_ratings_by_genres <- apply(edx[,Action:Western]*edx[,rating], 2, 
+                               FUN = function(x){
+                                 mean(x[x>0])
+                               })
+#ave_ratings_by_genres
+ave_rating_diff_by_genres <- round(ave_ratings_by_genres - overall_ave_rating, digits = 2)
+
+
+# calc percentage of movies listed under each individual genre
+percent_by_genres <- apply(edx[,Action:Western], 2, FUN = sum)
+percent_by_genres <- percent_by_genres / nrow(edx) * 100
+# percent_by_genres
+# sum(percent_by_genres)
+
+impact_score <- abs( round( percent_by_genres * ave_rating_diff_by_genres, 1))
+impact_table <- t(rbind(ave_ratings_by_genres,percent_by_genres, ave_rating_diff_by_genres,
+                        impact_score))
+
+
+#sort by impact
+#print("*Genre Impact Assessment Table Sorted by 'impact_score'*")
+impact_table <- impact_table[ order(impact_table[,4], decreasing = TRUE),]
+#show impact table
+knitr::kable(impact_table)
+
+#sort by diff in abs 
+#print("**Genre Impact Assessment Table Sorted by Absolute Value of Difference Between Genre Average Rating and Overall Average Rating**")
+impact_table <- impact_table[ order(abs(impact_table[,3]), decreasing = TRUE),]
+#show impact table
+knitr::kable(impact_table)
+
+#sort by percentage  
+#print("Genre Impact Assessment Table Sorted by Percentage of Movies Listed Under that Genre")
+impact_table <- impact_table[ order(abs(impact_table[,2]), decreasing = TRUE),]
+#show impact table
+knitr::kable(impact_table)
+```
+
+The tables above shows for each genre:
+
+1. ave_ratings_by_genres:  the average rating for a movie in that genre
+2. percent_by_genres:  the percentage of movies listed under that genre 
+3. ave_rating_diff_by_genresL  the difference between the genre average rating and the overall average rating for movies of 3.51
+4. impact_score:  a value which I created which is simply the ave_rating_diff_by_genres multiplied by the percentage_by_genre.  This is described further below.
+
+It should be noted that the "percent_by_genres" statistic listed for each genres shows the percentage of all movies tagged with that genre.  The number should not be confused as a true distribution over genres, since one movie can be listed with multiple genres and the total of this column will not add to 100%.  
+
+To assess the impact of a genre on ratings I have used the difference in average rating for a given genres as compared to the overall average rating.  For example the genres "Thriller" has no predictive power since it's average rating is the same as the overal average.  "Film Noir" has a large average rating difference from the overall rating average of 3.51.  However, very few movies are listed under Film Noir, so this would reduce the total impact of the Film Noir feature on total RMSE. 
+
+To assess the total impact of a genre on RMSE, I have created an indicative "impact" score measure which simply multiplies the the percentage of movies tagged under that genres multiplied by the rating difference from the average for that genres.  Looking at the top impact genres, you can estimate the genres that would likely explain the greatest amount of RMSE.  This is not a perfect measure however, since movies can be listed under multiple genres.  Further, it is likely that some genre listing are correlated and more likely to occur together, such as Drama and Crime (I can not think of many Comedy Crime movies and most Crime movies I recall are Drama's)
+
+Based on the information on the features created, it appears that there may be good predictive value by including the following in a model:
+
+1. the age of the movie at the time of rating
+2. the number of genres a movie is listed under
+3. indicators for genres with an impact score of 1.5 or higher.
+
+This assumption will be tested in the model development section
+
+
+
+### Modelling Approach
+
+#### Initial Model
+To start the modeling process, the "edx" training dataset provided was split into two datasets. One for training models only and a second "model validation" set for tesing models for performance comparison in order to choose better models without using the ultimate "validation" dataset provided for this project.  20% of the edx dataset was used as a model validation set.
+
+As a first step in building a predictive model, the prior work on the MovieLens data from the Hx Data Science series textbook was recreated.  This model uses regularized linear regression and included predictive variables for a movie effect and a user effect.  Given the size of the dataset for this project (10 million records compared to 100,000 records in the prior textbook work), I continued to use the approximate model fitting approach also used previously as opposed to a model package such as glmnet, which can be used for regularized linear regression.  
+
+This approach is also consistent with the project Objective which stated to “build on prior work” in Hx series.
+
+Cross validation was used to tune the model for the regularization parameter lambda. 
+
+The RMSE measure produced was 0.864769  
+
+
+
+#### Extending the Initial Model
+
+As a next step in model development, I extend the model to included new features extracted from base data.  This approach mimicked a stepwise regression approach by adding variable by considering their impact on model performance.  However, rather than test the impact of each variable at each step before adding to the model, I used judgement and the feature impact information I had from the above.
+
+The first extensions measured the impact of adding the age of the movie at the time of rating and the number of genres the movie was listed under.  This had a good improvement on prediction on the model validation set as measure by the reduction in RMSE.
+
+The impact of using the "pre_half_rating" indicator was added to test impact.  The impact on RMSE was neglible, so this feature was not included.
+
+A fuller model included the features:
+
+* movie effect
+* user effect
+* movie age at rating
+* number of genres the movie was listed under
+* indicators for movies tagged under the individual genres of
+  + Drama
+  + Comedy
+  + Action
+  + Crime
+  + SciFi
+  + Horror
+  + War
+  
+The RMSE of this model was 0.8642564, which excedes the better performance threshold given for this project.
+
+Consideration was given to refine this model further. Under the premise that Drama and Crime genres are likely highly overlapping in cases where they are listed, I tested the impact of replacing the Crime genre with Film Noir.  While few movies are tagged under Film Noir, those that are have a large variance in average rating from the overall average.  This model had a slight increase in RMSE as compared to the model including Crime, so a FilmNoir indicator was not included in the final model.
+
+Some consideration was given to fitting models other than regularized linear regression.  A simple tree model was fit.  However, this model performed far worse in initial testing and was not explored further.  A random forest approach was attempted but would not run on my computer given the size of the dataset.  Further model forms were not consider given that the regularized linear regression model appeared to meet the best performance standard as set in the project description.
+
+
+
+## Final Model and Test Results on Validation Set
+
+The final model chosen was the regularized linear regression model which included features for:
+
+* movie effect
+* user effect
+* movie age at rating
+* number of genres the movie was listed under
+* indicators for movies tagged under the individual genres of
+  + Drama
+  + Comedy
+  + Action
+  + Crime
+  + SciFi
+  + Horror
+  + War
+
+This final model was then trained on the full edx training set, including the lambda value used in regularization.
+
+The validation dataset provided was extended to generate the new features as described above from the base data. 
+
+The final model fit on the full edx dataset was tested to predict ratings on the validation set. The overall RMSE was 0.8642564 which is less than the 0.86490 best standard as provided in the project description.
+
+
+
+
+
+
+## Conclusions
+Using linear regression with regularization and additional features extracted from the base data provided, it was possible to fit a model that performed better than the best threshold set by the project description.  The final model fit had an overall RMSE 0.8642564 for predictions on the independent "validation" dataset.  This model has additional appeal in that it is intuitive in terms of relationships between the features used and ratings.  The model would also execute very fast on future data and could be used suitablyu within a website or other production environments.
+
+As always, future performance of this model depends on user behaving similar to past users in their rating practices as seen in the data used in this project.  All data provided was used, even though there is a clearly a change in ratings methodology after 2002, when half star ratings first appeared in the data. 
+
+Future work to consider would include:
+
+1. Given computing capacity,  mdels more complicated and computationally demanding could be tested.
+2. Interaction effects between features could be tested.  The current work did not explicitly look for interaction effects between features.
+3. Further work could be performed to see if the 2003 change in ratings collected could be better utilized or reflected.  One possibility would be to reperform the analysis using only data from 2003 onward, was this would presumably better match the user behaviour under a whole and half star rating scale now used.
+
+
+
+\newpage
+# Appendices
+
+## Appendix A - Output from summary function on key datasets
+
+The following shows the summary output information for the edx and validation datasets, including new features created in each.
+
+## Summary Output for the edx Dataset
+```{r summary_edx_validation, echo= FALSE}
+# using basic summary stats to assess data provided 
+summary(edx)
+summary(validation)
+
+```
+
+## Summary output for the validation Dataset
+```{r summary_edx_validation_2, echo= FALSE}
+# using basic summary stats to assess data provided 
+
+summary(validation)
+
+```
