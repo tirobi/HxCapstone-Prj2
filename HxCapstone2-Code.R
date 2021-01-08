@@ -769,6 +769,12 @@ train_rf <- train(data_train[, -c(1,18)],
                   tuneGrid = grid,
                   nSamp = 5000)
 ggplot(train_rf)
+# save plot for report
+jpeg(filename = "reportfiles/rfmtrytune.jpg")
+ggplot(train_rf)
+dev.off()
+
+# show best mtry value
 train_rf$bestTune
 
 

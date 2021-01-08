@@ -24,29 +24,19 @@ if(!require(lubridate)) install.packages("data.table", repos = "http://cran.us.r
 
 # Executive Summary
 
-This report describes work performed for the Independent Project which is part of the Hx Data Science Capstone Module.  This Capstone Module is the last of 9 modules which form the Hx Data Science certificate program. 
+This report describes work performed for the "Choose Your Own Project" which is part of the Hx Data Science Capstone Module.  This Capstone Module is the last of 9 modules which form the Hx Data Science certificate program. 
 
-The objective provided for this project is to create a model which best predicts movie ratings based on data provided.  The only specific guidance was to "build upon" the modeling work already performed within the textbook on similar data and to measure models considered based on RMSE ("Root Mean Squared Error"). No requirement was specified to test other model forms, though this was done to a limited extent. As none were given, I have not considered additional business considerations or constraints such as prediction run time, transparency of the model, model suitabity in a production environment, etc.
+I selected a dataset from the UCI Machine Learning Depository created for the goal of identifying people with Parkinson's Desease ("PD") based on voice measurement data.  The resulting objective of this project is then to build a machine learning model to predict Parkinson's disease patients, while demonstrating good modeling practice and good knowledge of the Hx Data Science series content.
 
-The data provided consisted of . 
+The data provided consisted of of a range of biomedical voice measurements from 31 people, 23 with Parkinson's disease. Each person had multiple measurement with 195 voice recording in total. The average incidence of Parkinson's in the data file is 75.4%.  The data appeared quite clean with no missing values or obvious outliers.  No modifications were made to the data.  The data was split into training, validation and a final independent test set for model training, assessment and final testing respectively. 
 
-The average incidence of Parkinson's in the data file is 75.4%.  By guessing
+In total total 5 model forms were tested for this binary classification problem.  In some cases, variants of each model form were tested as well. Models tested included a decision tree, logistic regression, principle component analysis transformed data with logistic regression, XGBoost and random forest.
 
-Model fitting and initial testing was performed on a training and model validation datasets which were created as subsets of the "edx" training data provided.  The final model chosen was tested for predictive power using the separate "validation" dataset provided in the project definition.   Feature selection was based on a combination of testing the impact on model performance and also by using some estimates of impact in combination with judgement.
+To assss what model was best, I set three main objectives which included model accuracy, tendancy for false positive or false negative errors and how interpretable the model is and its linkage from predictors to predictions.  False negatives were considered to be most costly, in a possible future model use setting, as these predictions could potentially prolong actual Parkinson's patients from getting early medical attention.  
 
-As a first modeling step, .  Second, .
+In the end, a simple classification tree was the best performing model.  When used on the independent test set, it had a prediction accuracy of 90%, which is much higher than the 70% Parkinson's rate in the test set.  Further, this model had the lowest false negative prediction rate of all models when compared on the validation data set.  
 
-The final model chosen was a . compare chosen to assess grid
-1. Predictive accuracy of the model.
-2. Relative risk or cost of false positive or false negative predictions.
-3. Interpretability of both the model and the relationship of predictions to predictor variables.
-4. Potential use of this model in future.
-
-
-The final model chosen e 
-
-
-
+It should always be noted that future performance of this model on other datasets depends on many factors such as the consistancy of data, for example in voice recording measurement approach or quality. 
 
 
 # Problem Statement & Objective
@@ -54,18 +44,16 @@ The final model chosen e
 The dataset selected was produced for the goal of identifying people with Parkinson's Desease ("PD") based on voice measurement data.  Following this, the objective of this analysis is to build a machine learning model that best predicts the presence of PD given audio voice measurement information.  I will define "best" to mean a model that balances various perspectives such as:
 
 1. Predictive accuracy of the model.
-2. The models false positive or false negative predictions.
+2. The models behaviour with false positive or false negative predictions.
 3. How interpretability is the model and the relationship of predictions to predictor variables in the model.
-4. Potential use of this model in future.
-
-explainb AUC, sensitivity, specificity
+4. More broadly, potential use of this model in future.
 
 
 In order to assess and balance in the objectives above, I have made the following assumptions:
 
-1. Model accuracy will be tracked as the percentage (in decimal) of total correct predictions (True Positive or True Negative),
-2. False positive and false negative prediction performance will be measured by specificity and sensitivity scores. The specificity score is measures the rate of negative predictions given a person is well.  The sensitivity score measures the rate of positive predictions given the person has Parkinson's.  I will also use the Area Under Curve ("AUC") score, measures a combination of specificity and sensitivity.  All these numbers are between 0 and 1 and higher is better.
-3. The PD onset predictions from this model will be used as an indicative, early warning measure as opposed to a real diagnosis tool. I'm assuming this would be used as a screening tool or as an inexpensive way to flag early onset.  For this reason: 
+1. Model accuracy will be tracked as the percentage (in decimal) of total correct predictions (ie True Positive and True Negative),
+2. False positive and false negative prediction performance will be measured by specificity and sensitivity scores. The specificity score is measures the rate of negative predictions given a person is well.  The sensitivity score measures the rate of positive predictions given the person has Parkinson's.  I will also use the Area Under Curve ("AUC")  measures that is a combination of specificity and sensitivity.  All these numbers are between 0 and 1 with higher being better.
+3. I'm assuming the PD onset predictions from this model will be used as an indicative, early warning measure as opposed to a real diagnosis tool. I'm assuming this would be used as a screening tool or as an inexpensive way to flag early onset.  For this reason: 
     a) I will give more weight to sensitivity than specificity.  Said another way, false positive predictions are generally more favourable than false negatives.  The rational is that a false negative could allow someone with PD to progress longer without the benefit of early treatment, which could be damaging.  However, a false positive may  cause some worry initially but will get a person in front of a doctor for a more thorough exam that will ultimately rule our the disease. 
     b) I will give predictive accuracy more weight than model interpretability.  More complex, less interpretable models will be given priority if their predictive results are much better.
 3. I do not have access to a subject matter expert ("SME").  Further work would best include consultation or collaboration with a SME in this subject.  This would be very helpful for feature selection or considering interactino effects.  Howeve, for this project I assume I have no access to a SME.  I will not use Google to do become a "15 minute expert" and act as if I know something about the subject which I do not.
@@ -112,11 +100,11 @@ To look for outlier and further insights, further visualizations and analysis wi
 
 
 
-### Data Validation Exploration
+### Data Validation & Exploration
 
 As will be explained further in the Modeling Approach section of this report, all data exploration was performed on the training dataset only.  In this way, the test dataset remains completely independent of any feature selection or modeling judgement.
 
-The following graphs show the distribution of each variable independently.  
+Figures 1 and 2 below show the distribution of each variable independently.  
 
 ![Data Variable Distribution Plots 1](reportfiles/plotdist1.jpg)
 
@@ -134,7 +122,7 @@ It is difficult to assess for outliers.  A subject matter expert would have appr
 
 To address the imbalance issue with the number of Parkinson's vs Healthy data subjects, I used up sampling to create a second training dataset for testing models.  This will be discussed more below.
 
-Visualizations are limited when the dependent variable is binary and the predictive variables are real or integer.  The following graph shows the relationship between the dependent variable "status" and each individual predictive variable.
+Visualizations are limited when the dependent variable is binary and the predictive variables are real or integer.  Figures 3 and 4 below show the relationship between the dependent variable "status" and each individual predictive variable.
 
 
 ![status Indicator VS Independent Variable Plots 1](reportfiles/plotrel1.jpg)
@@ -143,7 +131,7 @@ Visualizations are limited when the dependent variable is binary and the predict
 There are a number of variables that, for their larger values, show a strong difference between Parkinson's status values of 0 and 1.  However, there are no variables that show a strong difference over lower values (near zero).  This is expected to limit the power of a predictive model.  For most independent varialbes, when the variable value is closure to zero, it is a toss up as to whether status is 0 or 1.  Perhaps there is a combination of variables that will compensate for this.
 
 
-As previously noted, given the patterns seend in the data variable distributions, there are likely correlations among predictors.  The follwing is a correlation matrix among the data variables.
+As previously noted, given the patterns seend in the data variable distributions, there are likely correlations among predictors.  Figure 5 below is a correlation matrix among the data variables.
 
 ![Dataset Correlation Matrix Plot](reportfiles/plotcorr.jpeg)
 
@@ -153,7 +141,7 @@ The following observations are noted:
 2. There are grouping of variables that have a high positive correlations .  This is seen in the darker red boxes and line.
 3. The dependent variable status has a low to moderate correlation with most all independent variables.  Generally, this is not so good for as modeling is easier when there are a few strong correlations in different directions.
 
-In hopes of finding some hidden relationships in the data, a Principle Component Analysis ("PCA") was performed on the independent data variables.  The "elbow plot" showing the cummulative variance explained by each principle component is below.
+In hopes of finding some hidden relationships in the data, a Principle Component Analysis ("PCA") was performed on the independent data variables.  The "elbow plot" showing the cummulative variance explained by each principle component is shown in Figure 6 below.
 
 ![PCA - Cummulative Variance Explained Plot](reportfiles/pcacumvar.jpg){height=50%, width=50%}
 
@@ -202,7 +190,7 @@ To check if the ratio of positives is relatively consistent accross the dataset,
 
 #### First Model Form - Classification Tree
 
-To start the modeling process, a simple classification tree was fit to the data.  A picture of the resulting decision tree is below.
+To start the modeling process, a simple classification tree was fit to the data.  Figure 7 shows a diagram of the resulting decision tree.
 
 
 ![Classification Tree Plot](reportfiles/rpart1.jpg){height=75%, width=75%}
@@ -224,20 +212,23 @@ As test case, the regression tree approach was used again, but on the up sampled
 
 The second model assessed was for logistic regression, which is appropriate for binary outcome classification.
 
-As a naive first approach, I tried to fit a logistic regression model using all independent variables.  While this would result in an over fitted model, it would provide a best case performance indication.   The resulting over fit model could then be reduced using backward stepwise regression.  However, this model would not converge during fitting, which is consistent with the high degree of correlation seen in the independent variables.
+As a naive first approach, I tried to fit a logistic regression model using all independent variables.  While this would result in an over fitted model, it would provide a best case performance indication.   The resulting over fit model could then be reduced using backward stepwise regression.  However, this model would not converge during fitting, which is consistent with the high degree of correlation seen in the independent variables.  A model was returned by the glm function though, dispite the non-convergence.  This model had no significant coefficients yet still returned prediction results that appeared reasonable.  This model was not considered appropriate for potential use though.
 
-Forward stepwise regression was then used to fit a logistic regression model. Forward stepwiser regression adds available independent variables one at at time, using looking to find the most impactful variable, until new variables no longer have a coefficient that is statistically significant (or meets some p-value threshold as given).
+Forward stepwise regression was then used to fit a logistic regression model. Forward stepwiser regression adds available independent variables one at at time, searching to find the most impactful variable at each step, until new variables no longer have a coefficient that is statistically significant (or meets some p-value threshold as given).
 
 The final model form was as follows:
 
 status ~ spread1 + MDVP.APQ + Shimmer.DDA + MDVP.Flo.Hz. + D2 + 
         MDVP.Fhi.Hz. + DFA + HNR + PPE + Shimmer.APQ3 + RPDE + spread2
 
-Performance was as follows:
+Performance measures were as follows:
 
 |Method                             | Accuracy| Sensitivity| Specificity|  AUC|
 |:----------------------------------|--------:|-----------:|-----------:|----:|
 |Logistic Regression                |     0.83|        0.79|        1.00| 0.79|
+
+
+Add AUC graph and explain AUC?????
 
 
 The accuracy of this model was also good.  However, as the sensitivity rate was below 1.0, the model did produce some false negative predictions.
@@ -248,7 +239,7 @@ As a test, the up sampled dataset was used with forward stepwise regression to f
 
 #### Third Model Form - PCA with Logistic Regression
 
-Given the multicolinearity issue noted with the logistic regression model fitting, I used the transformed data matrix from the PCA as independent variables in a logistic regression model.  That is, I used the principle components as the independent variables.  The first 10 PC's were used as these explained 98% of the total variance in the data.  Since the PCs are orthoganal, the model converged without issue.  Stepwise backward regression was performed on this model, which was then reduced to using 6 PCs from the original 10. Stepwise backward regression removes the most significant independent variables one at a time until all remaining variables have statistically significant coefficients (or at least meet some p-value threshold as given). 
+Given the multicolinearity issue noted with the logistic regression model fitting, I used the transformed data matrix from the PCA as independent variables in a logistic regression model.  That is, I used the principle components as the independent variables.  The first 10 PC's were used as these explained 98% of the total variance in the data.  Since the PCs are orthoganal, the model converged without issue.  Stepwise backward regression was performed on this model, which was then reduced to using 6 PCs from the original 10. The stepwise backward regression approach remove weaker variables from a more complex model one at a time until removing further variables is too punishing on model performance according to some measure. 
 
 The final formula of the model was:
 
@@ -261,25 +252,27 @@ Before testing this model on the validation set, the data from the validation da
 |:----------------------------------|--------:|-----------:|-----------:|----:|
 |PCA with Logistic Regression       |     0.50|        0.62|        0.40| 0.77|
 
-This model did not perform well and was rejected.
+This model performaned poorly and was rejected.
 
 
 
 #### Fourth Model Form - XGBoost
 
-An XGBoost model was tested as this is a very popular model which reports to be powerful.  The results were as follows:
+A gradient boosting ensemble model was tested by using the XGBoost package.  This model is a very popular model which reports to be powerful.  The results were as follows:
 
 |Method                             | Accuracy| Sensitivity| Specificity|  AUC|
 |:----------------------------------|--------:|-----------:|-----------:|----:|
 |XGBoost Model                      |     0.83|        1.00|        0.57| 0.79|
 
-The performance same as the simple classification tree.  This is not entirely surprising as this model uses an itterative tree fitting algorithm.  Quoting [Machinelearningmastery.com/](https://machinelearningmastery.com/):
+The performance was the same as the simple classification tree.  This is not entirely surprising as this XGBoost model uses an itterative tree fitting algorithm.  Quoting [Machinelearningmastery.com/](https://machinelearningmastery.com/):
 
 > Boosting is an ensemble technique where new models are added to correct the errors made by existing models. Models are added sequentially until no further improvements can be made.
 
+Following this description, we can interpret these results to mean that the errors from the basic classification tree do not have any further predictive information (at least that XGBoost could dectect).
+
 XGBoost also allows a "DART" based modeling approach, as opposed to tree based.  The DART parameter was tested and made no change to results.
 
-Given that there was no prediction performance improvement, this model was rejected given the significant additional complexity and reduction in interpretability over the classification tree.
+Given that there was no prediction performance improvement, this model was rejected given as it adds significant complexity and reduction in interpretability over the classification tree.
 
 
 
@@ -287,11 +280,19 @@ Given that there was no prediction performance improvement, this model was rejec
 
 The final model model considered was the random forest.  Using the caret package train function, K-fold cross validation on the training set was used to tune the mtry parameter, which controls the number of independent variables randomly sampled as for potential use in splitting the tree at each decision point.
 
+The optimal value for mtry was 3, which can bee seen in Figure 8 below, which shows model accuracy over various mtry values tested in cross validation.
+
+![Figure](reportfiles/rfmtrytune.jpg){height=50%, width=50%}
+
+
+
+The random forest performance measures were as follows:
+
 |Method                             | Accuracy| Sensitivity| Specificity|  AUC|
 |:----------------------------------|--------:|-----------:|-----------:|----:|
 |Random Forest                      |     0.72|        1.00|        0.29| 0.50|
 
-Performance was not as good as classifcation tree. 
+Performance was not as good as classifcation tree. This is likely due to the random forest model intentionally limiting the number of variables considered for tree splitting at each node (in this case to 3).  This observation supports the regular classification tree as having foung the best splits, regardless of noise in the data and the potential for basic trees to overfit to that noise.
 
 
 
@@ -324,7 +325,7 @@ This final model type was then trained on the combined data from the training an
 
 The shape of the decision tree changed slightly after re-training on the train and validation data.  In fact, the tree became more simple. Pruning this final tree was not considered given its natural simplicity.
 
-A plot of the final classification tree is as follows.
+Figure 9 shows a diagram of the fianl decision tree. 
 
 
 ![Final Model - Classification Tree Plot](reportfiles/rpart_final.jpg){height=75%, width=75%}
