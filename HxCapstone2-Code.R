@@ -45,6 +45,12 @@ library(MASS)
 library(randomForest)
 
 
+# create subdirectory for report plots and files
+if (!file.exists("reportfiles")){
+  dir.create(file.path(".", "reportfiles"))
+}
+
+
 ###########################################################
 #
 # Load Data  
