@@ -2,7 +2,7 @@
 #
 #  R code showing analysis work performed by Tim Bishop
 #  as part of the Hx Data Science Capstone module 
-#  second project on a choose your own dataset
+#  Choose Your Own Project 
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
@@ -11,8 +11,8 @@
 
 ###########################################################
 #
-# prepare dataset, and initial setup
-# download dataset if it is not already in working directory
+# initial setup
+# 
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
@@ -48,6 +48,7 @@ library(randomForest)
 ###########################################################
 #
 # Load Data  
+# download dataset if it is not already in working directory
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
@@ -135,16 +136,11 @@ sum_train
 sum_validation 
 sum_test 
 
-# sum_comb <- cbind(sum_data, sum_train, sum_validation, sum_test)
-# t(sum_comb)
-# 
-# sum_comb[,1:5]
-# 
-# sum_train
+
 
 # calculate and review proportion of status=1 in various sets.
 # all seem reasonably close given dataset sizes.
-# choosing not to prusue stratified sampling.
+
 status_means <- data.frame( Group = "Full Data Set", Status_Mean= mean(data_original$status))
 status_means[2,1] <- "Train Set"
 status_means[2,2] <-  mean(data_train$status)
@@ -242,7 +238,10 @@ plot_corr
 
 # save plot to file for report
 jpeg(filename = "reportfiles/plotcorr.jpg")
-plot_corr
+plot_ly(
+  x = melted.cormat$Var1, y = melted.cormat$Var2,
+  z = melted.cormat$value, colorscale = "Reds", type = "heatmap"
+)
 dev.off()
 
 
@@ -269,6 +268,7 @@ sum_pca
 # look at pca rotations to see if particular dependent variables have very heavy weights
 model_pca$rotation
 
+# sample rotations for report
 knitr::kable( model_pca$rotation[,1:5])
 
 
@@ -340,7 +340,7 @@ roc_tree <- roc( data_validation$status,  as.numeric(pred_tree ))
 plot(roc_tree, xlim = c(1,0))
 # save plot to file for report
 jpeg(filename = "reportfiles/rpart1_roc.jpg")
-rpart.plot(fit_tree)
+plot(roc_tree, xlim = c(1,0))
 dev.off()
 
 # view Area Under Curve (under ROC curve)
@@ -411,11 +411,12 @@ glm.f
 
 # fit model
   glm_fit <- glm(glm.f,data=data_train[-1], family=binomial) 
+  # note: didn't converge in fitting
   
 # look at results summary
 summary(glm_fit)
 
-# # WIP: explain why using stepAIC, pros and cons
+#  backward stepwise not used since glm model didn't converge
 # glm_stepAIC <- stepAIC(glm, direction = "backward", k=2) # use AIC for variable removal decisions
 # 
 # 
@@ -450,6 +451,12 @@ results <- bind_rows(results,
 
 
 
+###########################################################
+#
+#  Model 4  Logistic REgression fit with forward stepwise regression
+#
+#
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
 #  Stepwise Logistic regression 
 
@@ -463,22 +470,24 @@ glm.fnone <- as.formula("status ~ 1")
 glm.fnone
 
 
-# fit model
+# fit model base model
 glm_fit_fnone <- glm(glm.fnone,data=data_train[-1], family=binomial)
 
 
+# run stepwise regression
 glm_Step = step(glm_fit_fnone, scope = list(upper=glm.fbig, lower=glm.fnone), 
                 scale = 0, direction = c('forward'))
 
 
 # look at results summary
 summary(glm_Step)
+# look at final formula
 glm_Step$formula
 
-glm_pred_val <- predict(glm_Step, data_validation[,-1],  type = 'response' ) 
+glm_step_pred_val <- predict(glm_Step, data_validation[,-1],  type = 'response' ) 
 
 # convert predictions and validation status vectors to factors with levels I want
-glm_step_pred_val <- factor(ifelse(glm_pred_val>=0.5,1,0), levels =  c(1,0), labels = c("Parkinsons","Healthy"))
+glm_step_pred_val <- factor(ifelse(glm_step_pred_val>=0.5,1,0), levels =  c(1,0), labels = c("Parkinsons","Healthy"))
 val_status <- factor(data_validation$status,levels =  c(1,0), labels = c("Parkinsons","Healthy"))
 
 #calc confusion matrix
@@ -488,141 +497,84 @@ cm_lr_step
 cm_lr_step$overall["Accuracy"]
 
 # ROC curve and AUC
-lr_roc <- roc(as.numeric(val_status), as.numeric(glm_step_pred_val))
-plot(rf_roc)
-lr_roc$auc
+lr_step_roc <- roc(as.numeric(val_status), as.numeric(glm_step_pred_val))
+plot(lr_step_roc)
+lr_step_roc$auc
 
 results <- bind_rows(results,
                      tibble(Method = 'Forward Stepwise Logistic Regression',
-                            Accuracy = cm_lr$overall["Accuracy"],
-                            Sensitivity = cm_lr$byClass["Sensitivity"],
-                            Specificity = cm_lr$byClass["Specificity"],
-                            AUC = lr_roc$auc[1]))
-
-
-
-
-
-
-#  Stepwise Logistic regression 
-
-# create model formula including all independent variable names
-glm.fbig <- as.formula(paste("status ~", paste(colnames(data_train)[-c(1,18)], collapse=" + ")))
-#  look at formula to check
-glm.fbig
-
-glm.fnone <- as.formula("status ~ 1")
-#  look at formula to check
-glm.fnone
-
-
-# fit model
-glm_fit_fnone <- glm(glm.fnone,data=data_up_train[-1], family=binomial)
-
-
-glm_Step = step(glm_fit_fnone, scope = list(upper=glm.fbig, lower=glm.fnone), 
-                scale = 0, direction = c('forward'))#, 
-#trace = 1, keep = NULL, steps = 1000, k = 2)
-
-
-# look at results summary
-summary(glm_Step)
-
-
-glm_pred_val <- predict(glm_Step, data_validation[,-1],  type = 'response' ) 
-
-# convert predictions and validation status vectors to factors with levels I want
-glm_step_pred_val <- factor(ifelse(glm_pred_val>=0.5,1,0), levels =  c(1,0), labels = c("Parkinsons","Healthy"))
-val_status <- factor(data_validation$status,levels =  c(1,0), labels = c("Parkinsons","Healthy"))
-
-#calc confusion matrix
-cm_lr_step <- confusionMatrix(data = val_status ,
-                              reference = glm_step_pred_val)
-cm_lr_step
-cm_lr_step$overall["Accuracy"]
-
-# ROC curve and AUC
-lr_roc <- roc(as.numeric(val_status), as.numeric(glm_step_pred_val))
-plot(rf_roc)
-lr_roc$auc
-
-results <- bind_rows(results,
-                     tibble(Method = 'Forward Stepwise Logistic Reg with Up Sampling',
-                            Accuracy = cm_lr$overall["Accuracy"],
-                            Sensitivity = cm_lr$byClass["Sensitivity"],
-                            Specificity = cm_lr$byClass["Specificity"],
-                            AUC = lr_roc$auc[1]))
-
-
-glm_Step$formula
-
-
-
-
-
-# ###########################################################################################
-# ###########################################################
-# #
-# #  Model 4  Logistic REgression on up sampled data
-# #
-# #
-# ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
-# 
-# # Using up Training
-# lr_up.f <- as.formula(paste("status ~", paste(colnames(data_up_train)[-c(1,18)], collapse=" + ")))
-# #glm.f <- as.formula("status ~ HNR") #, paste(colnames(data_train)[-c(1,18)], collapse=" + ")))
-# lr_up.f
-# 
-# #NOTE: # should family by bernouli??
-# fit_lr_up <- glm(lr_up.f,data=data_up_train[-1], family=binomial) #(link = "logit"))
-# summary(fit_lr_up)
-# 
-# # # WIP: explain why using stepAIC, pros and cons
-# # glm_stepAIC <- stepAIC(glm, direction = "backward", k=2) # use AIC for variable removal decisions
-# # 
-# # 
-# # glm_fit <- glm(glm_stepAIC$formula, data=data_up_train[-1], family=binomial)#(link = "logit"))
-# # 
-# # summary(glm_fit)
-# 
-# lr_up_pred_val <- predict(fit_lr_up, data_validation[,-1],  type = 'response' ) # se.fit = FALSE,
-# lr_up_pred_val <- factor(ifelse(lr_up_pred_val>=0.5,1,0), levels =  c(1,0), labels = c("Parkinsons","Healthy"))
-# val_status <- factor(data_validation$status,levels =  c(1,0), labels = c("Parkinsons","Healthy"))
-# 
-# 
-# cm_lr_up <- confusionMatrix(data = val_status ,
-#                 reference = lr_up_pred_val)
-# 
-# cm_lr_up
-# cm_lr_up$overall["Accuracy"]
-# 
-# # ROC curve and AUC
-# lr_up_roc <- roc(as.numeric(val_status), as.numeric(lr_up_pred_val))
-# plot(lr_up_roc)
-# lr_up_roc$auc
-# 
-# 
-# results <- bind_rows(results,
-#                      tibble(Method = 'Logistic Regression & Up Sampling',
-#                             Accuracy = cm_lr_up$overall["Accuracy"],
-#                             Sensitivity = cm_lr_up$byClass["Sensitivity"],
-#                             Specificity = cm_lr_up$byClass["Specificity"],
-#                             AUC = lr_up_roc$auc[1]))
+                            Accuracy = cm_lr_step$overall["Accuracy"],
+                            Sensitivity = cm_lr_step$byClass["Sensitivity"],
+                            Specificity = cm_lr_step$byClass["Specificity"],
+                            AUC = lr_step_roc$auc[1]))
 
 
 
 
 ###########################################################
 #
-#  Model 5  Logistic REgression on PCA transformed data
+#  Model 5  Stepwise Logistic regression on up sampled dataset
 #
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+
+# fit model
+glm_fit_fnone <- glm(glm.fnone,data=data_up_train[-1], family=binomial)
+
+
+glm_up_Step = step(glm_fit_fnone, scope = list(upper=glm.fbig, lower=glm.fnone), 
+                scale = 0, direction = c('forward'))
+
+
+# look at results summary
+summary(glm_up_Step)
+
+
+glm_up_pred_val <- predict(glm_up_Step, data_validation[,-1],  type = 'response' ) 
+
+# convert predictions and validation status vectors to factors with levels I want
+glm_up_step_pred_val <- factor(ifelse(glm_up_pred_val>=0.5,1,0), levels =  c(1,0), labels = c("Parkinsons","Healthy"))
+val_status <- factor(data_validation$status,levels =  c(1,0), labels = c("Parkinsons","Healthy"))
+
+#calc confusion matrix
+cm_lr_up_step <- confusionMatrix(data = val_status ,
+                              reference = glm_up_step_pred_val)
+cm_lr_up_step
+cm_lr_up_step$overall["Accuracy"]
+
+# ROC curve and AUC
+lr_up_roc <- roc(as.numeric(val_status), as.numeric(glm_up_step_pred_val))
+plot(lr_up_roc)
+lr_up_roc$auc
+
+results <- bind_rows(results,
+                     tibble(Method = 'Forward Stepwise Logistic Reg with Up Sampling',
+                            Accuracy = cm_lr_up_step$overall["Accuracy"],
+                            Sensitivity = cm_lr_up_step$byClass["Sensitivity"],
+                            Specificity = cm_lr_up_step$byClass["Specificity"],
+                            AUC = lr_up_roc$auc[1]))
+
+
+glm_up_Step$formula
+
+
+
+
+
+
+###########################################################
+#
+#  Model 6  Logistic REgression on PCA transformed data
+#
+#
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
+
 # use PCs to drive logistic regression
 glm_pca.f <- as.formula(paste("status ~", paste(colnames(model_pca$x[,1:10]), collapse=" + ")))
-#glm.f <- as.formula("status ~ HNR") #, paste(colnames(data_train)[-c(1,18)], collapse=" + ")))
+
 glm_pca.f
 
+# using dataframe with first 10 PCs and adding status variable
 glm_pca <- glm(glm_pca.f,data=data.frame(cbind(model_pca$x[,1:10],status=data_train[,18])), family=binomial) #(link = "logit"))
 summary(glm_pca)
 
@@ -635,13 +587,15 @@ summary(glm_pca_fit)
 
 # set up scaled, centered and rotated data on validation set
 data_val_pca <- scale( data_validation[,-c(1,18)], center = TRUE)
+
+# get predictions
 data_val_pca <- predict(model_pca, data_val_pca)
 
 
 
 glm_pca_pred_val <- predict(glm_pca_fit, 
                             data.frame(cbind(data_val_pca,status=data_validation[,18])),  
-                            type = 'response' ) # se.fit = FALSE,
+                            type = 'response' ) 
 
 # round to get rid of noise in almost zero values
 glm_pca_pred_val <- round(glm_pca_pred_val)
@@ -651,10 +605,11 @@ val_status <- factor(data_validation$status,levels =  c(1,0), labels = c("Parkin
 cm_pca <- confusionMatrix(data = val_status ,
                 reference = factor(glm_pca_pred_val, levels = c(1,0), labels = c("Parkinsons","Healthy")))
 
+cm_pca
 cm_pca$overall["Accuracy"]
 
 # ROC curve and AUC
-pca_roc <- roc(as.numeric(val_status), as.numeric(glm_pred_val))
+pca_roc <- roc(as.numeric(val_status), as.numeric(glm_pca_pred_val))
 plot(pca_roc)
 pca_roc$auc
 
@@ -672,7 +627,7 @@ results <- bind_rows(results,
 
 ###########################################################
 #
-#  Model 6 XGBoost 
+#  Model 7 XGBoost 
 #
 #
 #
@@ -690,7 +645,6 @@ pred_xgb_val = predict(fit_xgb, newdata = data.matrix(data_validation[,-c(1,18)]
 pred_xgb_val = as.integer(pred_xgb_val >= 0.5)
 
 # Making the Confusion Matrix
-#cm = table(y_test, y_pred)
 cm_xgb = confusionMatrix(factor(pred_xgb_val, levels = c("1","0"), labels = c("Parkinson", "Healthy")), 
                          factor(data_validation[,18], levels = c("1","0"), labels = c("Parkinson", "Healthy")))
 cm_xgb
@@ -719,14 +673,13 @@ pred_xgb_val = predict(fit_xgb, newdata = data.matrix(data_validation[,-c(1,18)]
 pred_xgb_val = as.integer(pred_xgb_val >= 0.5)
 
 # Making the Confusion Matrix
-#cm = table(y_test, y_pred)
 cm_xgb = confusionMatrix(factor(pred_xgb_val, levels = c("1","0"), labels = c("Parkinson", "Healthy")), 
                          factor(data_validation[,18], levels = c("1","0"), labels = c("Parkinson", "Healthy")))
 cm_xgb
 cm_xgb$overall["Accuracy"]
 
 
-# test 
+# test xgboost
 # using up trained data
 
 fit_xgb = xgboost(data = data.matrix(data_up_train[,-c(1,18)]), label = data.matrix(data_up_train[,18]), nrounds = 100)
@@ -748,7 +701,7 @@ cm_xgb$overall["Accuracy"]
 
 ###########################################################
 #
-#  Model 7  Random Forest 
+#  Model 8  Random Forest 
 #
 # 
 #
@@ -768,6 +721,7 @@ train_rf <- train(data_train[, -c(1,18)],
                   trControl = rf_control,
                   tuneGrid = grid,
                   nSamp = 5000)
+
 ggplot(train_rf)
 # save plot for report
 jpeg(filename = "reportfiles/rfmtrytune.jpg")
@@ -802,37 +756,19 @@ results <- bind_rows(results,
 
 
 
-
-# 
-# library(e1071)
-# fit_nb = naiveBayes(x = data_train[, -c(1,18)],
-#                     y = data_train[,18])
-# 
-# # Predicting the Test set results
-# pred_nb = predict(fit_nb, newdata = data_validation[,-c(1,18)])
-# 
-# cm <- confusionMatrix(pred_nb, 
-#                       factor(data_validation[,18], levels = c("1","0"), labels = c("Parkinson", "Healthy")))
-# cm
-# cm$overall["Accuracy"]
-# 
-
-
-
-
 ###########################################################
 #
 #  SElecting  Final Model 
-#  and refitting on full train / validation combined dataset 
 #
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-
-
+# review results table
 results
 
+# Rmd friendly version of results
 knitr::kable(results, digits = 2)
+
 
 
 ###########################################################
@@ -842,18 +778,12 @@ knitr::kable(results, digits = 2)
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ###
 
 
-
-# NOTE: dropping field for "Name" which is an identifier and not a variable
 final_model <- rpart(status ~ . , data = data.frame(data_original[-test_index,-1]), method = "class", 
                   control = rpart.control(minbucket = 5, cp = .00001, maxdepth = 10))
 
 
 rpart.plot(final_model)
 
-
-# do check on new features created to look for consistency with those in edx dataset
-# and look for odd values
-summary(validation)  # looks OK.
 
 
 ###########################################################
@@ -879,8 +809,8 @@ jpeg(filename = "reportfiles/rpart_final.jpg")
 rpart.plot(final_model)
 dev.off()
 
-# cal receiver operator curve, plot curve, save plot to file
-roc_final <- roc( data_test$status,  as.numeric(pred_final ))
+# calc receiver operator curve, plot curve, save plot to file
+roc_final <- roc( data_test$status,  ifelse(pred_final==1,1,0))
 plot(roc_final, xlim = c(1,0))
 # save plot to file for report
 jpeg(filename = "reportfiles/rpart1_final_roc.jpg")
@@ -888,23 +818,15 @@ plot(roc_final, xlim = c(1,0))
 dev.off()
 
 # view Area Under Curve (under ROC curve)
-roc_tree$auc
+roc_final$auc
 
-# same model results for comparison later
+# final model results
 knitr::kable( tibble(Method = 'Final Model - Classification Tree',
                             Accuracy = cm_final$overall["Accuracy"],
                             Sensitivity = cm_final$byClass["Sensitivity"],
                             Specificity = cm_final$byClass["Specificity"],
-                            AUC = roc_final$auc[1]))
+                            AUC = roc_final$auc[1]),
+              digits = 2)
 
-
-# predict on final validation set (seperate from  edx dataset)
-
-
-print("Final Model Results")
-print("Final model uses regularized regresssion")
-print("with independent variables for movie effect, user effect, age at rating, # genres and indicators for most predictive genres")
-print("rating ~ movieId + userId + age_at_rating + genres_count + Drama + Comedy + Action + Crime + SciFi + Horror + War")
-print(paste("Provides RMSE = " , as.character(final_rmse)))
 
 
